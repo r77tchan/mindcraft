@@ -1,5 +1,4 @@
 import { Vec3 } from 'vec3';
-import { Camera } from "./camera.js";
 import fs from 'fs';
 
 export class VisionInterpreter {
@@ -8,11 +7,19 @@ export class VisionInterpreter {
         this.allow_vision = allow_vision;
         this.fp = './bots/'+agent.name+'/screenshots/';
         if (allow_vision) {
-            this.camera = new Camera(agent.bot, this.fp);
+            // camera.js depends on the native `gl` package, which is optional (no prebuilt binary for Node 24),
+            // so only load it when vision is enabled
+            this.camera_ready = import('./camera.js').then(({ Camera }) => {
+                this.camera = new Camera(agent.bot, this.fp);
+            }).catch(err => {
+                console.error('Failed to load vision camera, disabling vision:', err.message);
+                this.allow_vision = false;
+            });
         }
     }
 
     async lookAtPlayer(player_name, direction) {
+        await this.camera_ready;
         if (!this.allow_vision || !this.agent.prompter.vision_model.sendVisionRequest) {
             return "Vision is disabled. Use other methods to describe the environment.";
         }
@@ -39,6 +46,7 @@ export class VisionInterpreter {
     }
 
     async lookAtPosition(x, y, z) {
+        await this.camera_ready;
         if (!this.allow_vision || !this.agent.prompter.vision_model.sendVisionRequest) {
             return "Vision is disabled. Use other methods to describe the environment.";
         }
