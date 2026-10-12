@@ -33,7 +33,7 @@ const ERROR_DEFINITIONS = {
         isFatal: false
     },
     'behavior': {
-        keywords: ['flying', 'spam', 'speed'],
+        keywords: ['flying', 'spam', 'speed', 'invalid_player_movement'],
         msg: 'Kicked: Removed from server due to flying, spamming, or invalid movement.',
         isFatal: true
     }
@@ -64,7 +64,10 @@ export function parseKickReason(reason) {
     let fallback = raw;
     try {
         const obj = typeof reason === 'string' ? JSON.parse(reason) : reason;
-        fallback = obj.translate || obj.text || (obj.value?.translate) || raw;
+        // newer versions send the reason as NBT, where each field is wrapped like {type, value}
+        const unwrap = (v) => (v && typeof v === 'object' && 'value' in v) ? unwrap(v.value) : v;
+        const text = [obj.translate, obj.text, obj.value?.translate, obj.value?.text].map(unwrap).find(v => typeof v === 'string' && v);
+        fallback = text || raw;
     } catch (_) {}
     
     return { type: 'other', msg: `Disconnected: ${fallback}`, isFatal: true };
