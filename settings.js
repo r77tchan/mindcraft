@@ -10,7 +10,7 @@ const settings = {
     
     "base_profile": "assistant", // survival, assistant, creative, or god_mode
     "profiles": [
-        "./custom/profiles/haiku.json",
+        "./custom/profiles/mochi.json",
         // "./andy.json",
         // "./profiles/gpt.json",
         // "./profiles/claude.json",
