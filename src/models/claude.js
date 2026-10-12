@@ -19,6 +19,10 @@ export class Claude {
 
     async sendRequest(turns, systemMessage) {
         const messages = strictFormat(turns);
+        // newer models (4.6+) reject requests that end with an assistant message (prefill)
+        if (messages[messages.length - 1].role === 'assistant') {
+            messages.push({role: 'user', content: '_'});
+        }
         let res = null;
         try {
             console.log(`Awaiting anthropic response from ${this.model_name}...`)
@@ -27,9 +31,11 @@ export class Claude {
                     this.params.max_tokens = this.params.thinking.budget_tokens + 1000;
                     // max_tokens must be greater than thinking.budget_tokens
                 } else {
-                    this.params.max_tokens = 4096;
+                    // newer models think by default, and thinking tokens count toward max_tokens
+                    this.params.max_tokens = 16000;
                 }
             }
+            const start = Date.now();
             const resp = await this.anthropic.messages.create({
                 model: this.model_name || "claude-sonnet-4-6",
                 system: systemMessage,
@@ -37,13 +43,18 @@ export class Claude {
                 ...(this.params || {})
             });
 
-            console.log('Received.')
+            const usage = resp.usage;
+            console.log(`Received. (${Date.now() - start}ms, input: ${usage.input_tokens}, cache read: ${usage.cache_read_input_tokens ?? 0}, cache write: ${usage.cache_creation_input_tokens ?? 0}, output: ${usage.output_tokens})`);
+            if (resp.stop_reason === 'refusal') {
+                console.warn('Claude refused to respond:', resp.stop_details);
+                return "Sorry, I can't respond to that.";
+            }
             // get first content of type text
             const textContent = resp.content.find(content => content.type === 'text');
             if (textContent) {
                 res = textContent.text;
             } else {
-                console.warn('No text content found in the response.');
+                console.warn(`No text content found in the response. (stop_reason: ${resp.stop_reason})`);
                 res = 'No response from Claude.';
             }
         }

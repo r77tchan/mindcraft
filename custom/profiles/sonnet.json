@@ -1,0 +1,12 @@
+{
+    "name": "sonnet",
+
+    "model": {
+        "model": "claude-sonnet-5-5",
+        "params": {
+            "output_config": {
+                "effort": "medium"
+            }
+        }
+    }
+}
