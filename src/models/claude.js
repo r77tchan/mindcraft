@@ -55,26 +55,29 @@ export class Claude {
                     this.params.max_tokens = 16000;
                 }
             }
-            const start = Date.now();
-            const resp = await this.anthropic.messages.create({
-                model: this.model_name || "claude-sonnet-4-6",
-                system: system,
-                messages: messages,
-                ...(this.params || {})
-            });
+            // newer models occasionally return an empty response, so retry once
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                const start = Date.now();
+                const resp = await this.anthropic.messages.create({
+                    model: this.model_name || "claude-sonnet-4-6",
+                    system: system,
+                    messages: messages,
+                    ...(this.params || {})
+                });
 
-            const usage = resp.usage;
-            console.log(`Received. (${Date.now() - start}ms, input: ${usage.input_tokens}, cache read: ${usage.cache_read_input_tokens ?? 0}, cache write: ${usage.cache_creation_input_tokens ?? 0}, output: ${usage.output_tokens})`);
-            if (resp.stop_reason === 'refusal') {
-                console.warn('Claude refused to respond:', resp.stop_details);
-                return "Sorry, I can't respond to that.";
-            }
-            // get first content of type text
-            const textContent = resp.content.find(content => content.type === 'text');
-            if (textContent) {
-                res = textContent.text;
-            } else {
-                console.warn(`No text content found in the response. (stop_reason: ${resp.stop_reason})`);
+                const usage = resp.usage;
+                console.log(`Received. (${Date.now() - start}ms, input: ${usage.input_tokens}, cache read: ${usage.cache_read_input_tokens ?? 0}, cache write: ${usage.cache_creation_input_tokens ?? 0}, output: ${usage.output_tokens})`);
+                if (resp.stop_reason === 'refusal') {
+                    console.warn('Claude refused to respond:', resp.stop_details);
+                    return "Sorry, I can't respond to that.";
+                }
+                // get first content of type text (a tab is a valid "nothing to say" response, so don't trim)
+                const textContent = resp.content.find(content => content.type === 'text' && content.text);
+                if (textContent) {
+                    res = textContent.text;
+                    break;
+                }
+                console.warn(`No text content found in the response. (stop_reason: ${resp.stop_reason}, attempt ${attempt}/2)`);
                 res = 'No response from Claude.';
             }
         }
